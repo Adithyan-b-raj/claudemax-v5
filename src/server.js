@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { initDB } = require('./db');
+const { STRIP_INCOMING_HEADERS } = require('./utils/cli-identity');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +12,15 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.text({ limit: '50mb', type: 'text/*' }));
+
+// Strip any client identity headers so the real caller's fingerprint
+// never leaks into route handlers or gets forwarded upstream.
+app.use((req, _res, next) => {
+    for (const h of STRIP_INCOMING_HEADERS) {
+        delete req.headers[h];
+    }
+    next();
+});
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,

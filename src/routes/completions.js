@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { validateKey } = require('../auth');
 const { incrementTokens } = require('../db');
+const { sanitizePayload } = require('../utils/sanitizer');
+const { getUpstreamHeaders } = require('../utils/cli-identity');
 
 router.post('/v1/chat/completions', async (req, res) => {
     const auth = validateKey(req);
@@ -21,6 +23,7 @@ router.post('/v1/chat/completions', async (req, res) => {
     if (parsedBody.model && !/sonnet-4-6/i.test(parsedBody.model)) {
         return res.status(400).json({ error: { type: "invalid_request_error", message: "Model not allowed. Only claude-sonnet-4-6 is available through this API." } });
     }
+    parsedBody = sanitizePayload(parsedBody);
     parsedBody.model = model;
     isStream = parsedBody.stream === true;
 
@@ -29,13 +32,7 @@ router.post('/v1/chat/completions', async (req, res) => {
             `https://bedrock-runtime.${region}.amazonaws.com/openai/v1/chat/completions`,
             {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${process.env.AWS_BEARER_TOKEN_BEDROCK}`,
-                    "Content-Type": "application/json",
-                    "User-Agent": "claude-code/0.2.29 node/v20.18.0 linux-x64",
-                    "X-App-Name": "claude-code",
-                    "X-Client-Name": "claude-code",
-                },
+                headers: getUpstreamHeaders(process.env.AWS_BEARER_TOKEN_BEDROCK),
                 body: JSON.stringify(parsedBody),
             }
         );

@@ -3,6 +3,8 @@ const router = express.Router();
 const { validateKey } = require('../auth');
 const { incrementTokens } = require('../db');
 const { readEventFrame, normalizeBedRockError } = require('../utils/bedrock');
+const { sanitizePayload } = require('../utils/sanitizer');
+const { getUpstreamHeaders } = require('../utils/cli-identity');
 
 router.post('/v1/messages', async (req, res) => {
     const auth = validateKey(req);
@@ -22,9 +24,10 @@ router.post('/v1/messages', async (req, res) => {
         });
     }
 
+    parsed = sanitizePayload(parsed);
+
     delete parsed.model;
     delete parsed.stream;
-    delete parsed.context_management;
     parsed.anthropic_version = "bedrock-2023-05-31";
     const bedrockBody = JSON.stringify(parsed);
 
@@ -36,13 +39,7 @@ router.post('/v1/messages', async (req, res) => {
     try {
         const upstream = await fetch(invokeUrl, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${process.env.AWS_BEARER_TOKEN_BEDROCK}`,
-                "User-Agent": "claude-code/0.2.29 node/v20.18.0 linux-x64",
-                "X-App-Name": "claude-code",
-                "X-Client-Name": "claude-code",
-            },
+            headers: getUpstreamHeaders(process.env.AWS_BEARER_TOKEN_BEDROCK),
             body: bedrockBody,
         });
 
