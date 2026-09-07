@@ -71,7 +71,6 @@ const STRIP_INCOMING_HEADERS = [
     "x-client-version",
     "x-request-id",
     "anthropic-version",
-    "x-api-key",
 ];
 
 module.exports = {
