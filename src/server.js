@@ -9,7 +9,7 @@ const { STRIP_INCOMING_HEADERS } = require('./utils/cli-identity');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.set('trust proxy', true);
+app.set('trust proxy', 1); // trust only the immediate nginx reverse proxy
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));

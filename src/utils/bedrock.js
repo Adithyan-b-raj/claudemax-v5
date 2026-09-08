@@ -36,6 +36,7 @@ function normalizeBedRockError(body) {
             const typeMap = {
                 "ValidationException": "invalid_request_error",
                 "ThrottlingException": "rate_limit_error",
+                "ServiceUnavailableException": "api_error",
                 "ModelNotReadyException": "api_error",
                 "ModelStreamErrorException": "api_error",
                 "AccessDeniedException": "authentication_error",
@@ -63,22 +64,23 @@ function normalizeBedRockError(body) {
  * @returns {Promise<Response>}
  */
 async function withRetry(fn, maxRetries = 3, baseDelayMs = 10_000) {
+    const RETRYABLE = new Set([429, 503]);
     let lastRes;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             lastRes = await fn();
-            if (lastRes.status !== 429) return lastRes;
+            if (!RETRYABLE.has(lastRes.status)) return lastRes;
         } catch (err) {
             if (attempt === maxRetries) throw err;
         }
 
         if (attempt < maxRetries) {
             const delay = baseDelayMs * Math.pow(2, attempt); // 10s, 20s, 40s
-            console.warn(`[retry] Attempt ${attempt + 1} got 429. Retrying in ${delay / 1000}s...`);
+            console.warn(`[retry] Attempt ${attempt + 1} got ${lastRes?.status ?? 'error'}. Retrying in ${delay / 1000}s...`);
             await new Promise(r => setTimeout(r, delay));
         }
     }
-    return lastRes; // return final 429 after all retries exhausted
+    return lastRes;
 }
 
 module.exports = { parseEventHeaders, readEventFrame, normalizeBedRockError, withRetry };
