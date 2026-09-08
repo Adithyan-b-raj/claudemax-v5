@@ -62,6 +62,18 @@ function initDB() {
     for (const sql of migrations) {
         try { db.exec(sql); } catch (_) { /* column already exists */ }
     }
+
+    // One-time backfill: for keys that had usage before lifetime tracking was introduced,
+    // seed total_* from the current period counters so All-Time Total shows correctly.
+    db.exec(`
+        UPDATE api_keys
+        SET total_tokens_used   = tokens_used,
+            total_input_tokens  = input_tokens,
+            total_output_tokens = output_tokens,
+            total_cache_tokens  = cache_tokens
+        WHERE total_tokens_used = 0
+          AND tokens_used > 0
+    `);
 }
 
 function getKey(apiKey) {
