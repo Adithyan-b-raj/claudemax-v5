@@ -45,6 +45,10 @@ router.get('/keys', checkAdminAuth, (req, res) => {
         tokensRefillAt: r.tokens_refill_at ?? null,
         refillInterval: r.refill_interval ?? "5h",
         boundIp: r.bound_ip ?? null,
+        totalTokensUsed: r.total_tokens_used ?? 0,
+        totalInputTokens: r.total_input_tokens ?? 0,
+        totalOutputTokens: r.total_output_tokens ?? 0,
+        totalCacheTokens: r.total_cache_tokens ?? 0,
     }));
     res.json({ keys });
 });

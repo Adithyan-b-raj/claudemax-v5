@@ -16,26 +16,36 @@ db.pragma('journal_mode = WAL');
 function initDB() {
     db.exec(`
     CREATE TABLE IF NOT EXISTS api_keys (
-      api_key             TEXT PRIMARY KEY,
-      name                TEXT NOT NULL,
-      created_at          TEXT NOT NULL,
-      expires_at          TEXT NOT NULL,
-      token_limit         INTEGER NOT NULL DEFAULT 0,
-      tokens_used         INTEGER NOT NULL DEFAULT 0,
-      input_tokens        INTEGER NOT NULL DEFAULT 0,
-      output_tokens       INTEGER NOT NULL DEFAULT 0,
-      cache_tokens        INTEGER NOT NULL DEFAULT 0,
-      has_refill          INTEGER NOT NULL DEFAULT 0,
-      tokens_refill_at    TEXT,
-      refill_interval     TEXT DEFAULT '5h',
-      bound_ip            TEXT DEFAULT NULL
+      api_key               TEXT PRIMARY KEY,
+      name                  TEXT NOT NULL,
+      created_at            TEXT NOT NULL,
+      expires_at            TEXT NOT NULL,
+      token_limit           INTEGER NOT NULL DEFAULT 0,
+      tokens_used           INTEGER NOT NULL DEFAULT 0,
+      input_tokens          INTEGER NOT NULL DEFAULT 0,
+      output_tokens         INTEGER NOT NULL DEFAULT 0,
+      cache_tokens          INTEGER NOT NULL DEFAULT 0,
+      has_refill            INTEGER NOT NULL DEFAULT 0,
+      tokens_refill_at      TEXT,
+      refill_interval       TEXT DEFAULT '5h',
+      bound_ip              TEXT DEFAULT NULL,
+      total_tokens_used     INTEGER NOT NULL DEFAULT 0,
+      total_input_tokens    INTEGER NOT NULL DEFAULT 0,
+      total_output_tokens   INTEGER NOT NULL DEFAULT 0,
+      total_cache_tokens    INTEGER NOT NULL DEFAULT 0
     )
   `);
 
-    try {
-        db.exec(`ALTER TABLE api_keys ADD COLUMN bound_ip TEXT DEFAULT NULL`);
-    } catch (err) {
-        // Column already exists or table freshly created
+    // Migrations for existing databases — silently skip if column already exists
+    const migrations = [
+        `ALTER TABLE api_keys ADD COLUMN bound_ip TEXT DEFAULT NULL`,
+        `ALTER TABLE api_keys ADD COLUMN total_tokens_used INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE api_keys ADD COLUMN total_input_tokens INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE api_keys ADD COLUMN total_output_tokens INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE api_keys ADD COLUMN total_cache_tokens INTEGER NOT NULL DEFAULT 0`,
+    ];
+    for (const sql of migrations) {
+        try { db.exec(sql); } catch (_) { /* column already exists */ }
     }
 }
 
@@ -48,8 +58,12 @@ function putKey(apiKey, record) {
     const interval = record.refillInterval || "5h";
     const refillAt = record.hasRefill ? nextRefillTime(interval) : null;
     db.prepare(
-        `INSERT OR REPLACE INTO api_keys (api_key, name, created_at, expires_at, token_limit, tokens_used, input_tokens, output_tokens, cache_tokens, has_refill, tokens_refill_at, refill_interval, bound_ip)
-     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, NULL)`
+        `INSERT OR REPLACE INTO api_keys
+         (api_key, name, created_at, expires_at, token_limit,
+          tokens_used, input_tokens, output_tokens, cache_tokens,
+          has_refill, tokens_refill_at, refill_interval, bound_ip,
+          total_tokens_used, total_input_tokens, total_output_tokens, total_cache_tokens)
+         VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, NULL, 0, 0, 0, 0)`
     ).run(apiKey, record.name, record.createdAt, record.expiresAt, record.tokenLimit ?? 0, hasRefill, refillAt, interval);
 }
 
@@ -65,8 +79,17 @@ function incrementTokens(apiKey, { input = 0, output = 0, cache = 0 } = {}) {
     const total = input + output + cache;
     if (total <= 0) return;
     db.prepare(
-        "UPDATE api_keys SET tokens_used = tokens_used + ?, input_tokens = input_tokens + ?, output_tokens = output_tokens + ?, cache_tokens = cache_tokens + ? WHERE api_key = ?"
-    ).run(total, input, output, cache, apiKey);
+        `UPDATE api_keys SET
+           tokens_used         = tokens_used         + ?,
+           input_tokens        = input_tokens        + ?,
+           output_tokens       = output_tokens       + ?,
+           cache_tokens        = cache_tokens        + ?,
+           total_tokens_used   = total_tokens_used   + ?,
+           total_input_tokens  = total_input_tokens  + ?,
+           total_output_tokens = total_output_tokens + ?,
+           total_cache_tokens  = total_cache_tokens  + ?
+         WHERE api_key = ?`
+    ).run(total, input, output, cache, total, input, output, cache, apiKey);
 }
 
 function updateRefill(apiKey, enable, refillAt, interval) {
@@ -76,6 +99,7 @@ function updateRefill(apiKey, enable, refillAt, interval) {
 }
 
 function resetTokens(apiKey) {
+    // Resets only the current-period counters; lifetime totals are preserved.
     db.prepare(
         "UPDATE api_keys SET tokens_used = 0, input_tokens = 0, output_tokens = 0, cache_tokens = 0 WHERE api_key = ?"
     ).run(apiKey);
@@ -86,8 +110,12 @@ function updateTokenLimit(apiKey, tokenLimit) {
 }
 
 function performRefillReset(apiKey, nextRefill) {
+    // Zeroes only the current-period counters; lifetime totals are NOT touched.
     db.prepare(
-        "UPDATE api_keys SET tokens_used = 0, input_tokens = 0, output_tokens = 0, cache_tokens = 0, tokens_refill_at = ? WHERE api_key = ?"
+        `UPDATE api_keys SET
+           tokens_used = 0, input_tokens = 0, output_tokens = 0, cache_tokens = 0,
+           tokens_refill_at = ?
+         WHERE api_key = ?`
     ).run(nextRefill, apiKey);
 }
 
