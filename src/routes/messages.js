@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { validateKey } = require('../auth');
 const { incrementTokens } = require('../db');
-const { readEventFrame, normalizeBedRockError } = require('../utils/bedrock');
+const { readEventFrame, normalizeBedRockError, withRetry } = require('../utils/bedrock');
 const { sanitizePayload } = require('../utils/sanitizer');
 const { getUpstreamHeaders } = require('../utils/cli-identity');
+const { enqueue } = require('../utils/queue');
 
 router.post('/v1/messages', async (req, res) => {
     const auth = validateKey(req);
@@ -34,22 +35,30 @@ router.post('/v1/messages', async (req, res) => {
     const region = process.env.AWS_REGION || "us-east-1";
     const model = process.env.ANTHROPIC_MODEL || "us.anthropic.claude-sonnet-4-6";
     const bedrockBase = `https://bedrock-runtime.${region}.amazonaws.com/model/${encodeURIComponent(model)}`;
-    const invokeUrl = isStream ? `${bedrockBase}/invoke-with-response-stream` : `${bedrockBase}/invoke`;
 
     try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 60_000); // 60s timeout
-        let upstream;
-        try {
-            upstream = await fetch(invokeUrl, {
-                method: "POST",
-                headers: getUpstreamHeaders(process.env.AWS_BEARER_TOKEN_BEDROCK),
-                body: bedrockBody,
-                signal: controller.signal,
-            });
-        } finally {
-            clearTimeout(timeout);
-        }
+        // Option 4: queue  — controls outbound rate, prevents burst spikes
+        // Option 1: retry  — retries on 429 with exponential backoff (up to 3x)
+        const upstream = await enqueue(() =>
+            withRetry(async () => {
+                const invokeUrl = isStream
+                    ? `${bedrockBase}/invoke-with-response-stream`
+                    : `${bedrockBase}/invoke`;
+
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 60_000);
+                try {
+                    return await fetch(invokeUrl, {
+                        method: "POST",
+                        headers: getUpstreamHeaders(process.env.AWS_BEARER_TOKEN_BEDROCK),
+                        body: bedrockBody,
+                        signal: controller.signal,
+                    });
+                } finally {
+                    clearTimeout(timeout);
+                }
+            })
+        );
 
         if (isStream && !upstream.ok) {
             const errBody = await upstream.text();
