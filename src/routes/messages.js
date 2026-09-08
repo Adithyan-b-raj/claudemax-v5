@@ -37,11 +37,19 @@ router.post('/v1/messages', async (req, res) => {
     const invokeUrl = isStream ? `${bedrockBase}/invoke-with-response-stream` : `${bedrockBase}/invoke`;
 
     try {
-        const upstream = await fetch(invokeUrl, {
-            method: "POST",
-            headers: getUpstreamHeaders(process.env.AWS_BEARER_TOKEN_BEDROCK),
-            body: bedrockBody,
-        });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60_000); // 60s timeout
+        let upstream;
+        try {
+            upstream = await fetch(invokeUrl, {
+                method: "POST",
+                headers: getUpstreamHeaders(process.env.AWS_BEARER_TOKEN_BEDROCK),
+                body: bedrockBody,
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
 
         if (isStream && !upstream.ok) {
             const errBody = await upstream.text();
@@ -130,6 +138,13 @@ router.post('/v1/messages', async (req, res) => {
         const outBody = upstream.ok ? respBody : normalizeBedRockError(respBody);
         res.status(upstream.status).type("application/json").send(outBody);
     } catch (err) {
+        if (err.name === 'AbortError') {
+            console.error("Bedrock request timed out after 60s");
+            return res.status(504).json({
+                type: "error",
+                error: { type: "api_error", message: "Upstream Bedrock request timed out. Please retry." }
+            });
+        }
         console.error("Bedrock fetch error:", err);
         res.status(500).json({ error: "Internal server error forwarding to Bedrock" });
     }
