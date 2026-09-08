@@ -7,6 +7,7 @@ const {
     resetTokens,
     updateTokenLimit,
     updateRefill,
+    resetKeyIp,
 } = require('../db');
 const { generateKey } = require('../utils/keygen');
 const { nextRefillTime } = require('../utils/time');
@@ -43,6 +44,7 @@ router.get('/keys', checkAdminAuth, (req, res) => {
         hasRefill: !!r.has_refill,
         tokensRefillAt: r.tokens_refill_at ?? null,
         refillInterval: r.refill_interval ?? "5h",
+        boundIp: r.bound_ip ?? null,
     }));
     res.json({ keys });
 });
@@ -87,6 +89,13 @@ router.post('/reset-tokens', checkAdminAuth, (req, res) => {
     const body = req.body || {};
     if (!body.apiKey) return res.status(400).json({ error: "apiKey required" });
     resetTokens(body.apiKey);
+    res.json({ ok: true });
+});
+
+router.post('/reset-ip', checkAdminAuth, (req, res) => {
+    const body = req.body || {};
+    if (!body.apiKey) return res.status(400).json({ error: "apiKey required" });
+    resetKeyIp(body.apiKey);
     res.json({ ok: true });
 });
 

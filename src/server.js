@@ -9,6 +9,8 @@ const { STRIP_INCOMING_HEADERS } = require('./utils/cli-identity');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set('trust proxy', true);
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.text({ limit: '50mb', type: 'text/*' }));

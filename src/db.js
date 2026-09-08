@@ -27,9 +27,16 @@ function initDB() {
       cache_tokens        INTEGER NOT NULL DEFAULT 0,
       has_refill          INTEGER NOT NULL DEFAULT 0,
       tokens_refill_at    TEXT,
-      refill_interval     TEXT DEFAULT '5h'
+      refill_interval     TEXT DEFAULT '5h',
+      bound_ip            TEXT DEFAULT NULL
     )
   `);
+
+    try {
+        db.exec(`ALTER TABLE api_keys ADD COLUMN bound_ip TEXT DEFAULT NULL`);
+    } catch (err) {
+        // Column already exists or table freshly created
+    }
 }
 
 function getKey(apiKey) {
@@ -41,8 +48,8 @@ function putKey(apiKey, record) {
     const interval = record.refillInterval || "5h";
     const refillAt = record.hasRefill ? nextRefillTime(interval) : null;
     db.prepare(
-        `INSERT OR REPLACE INTO api_keys (api_key, name, created_at, expires_at, token_limit, tokens_used, input_tokens, output_tokens, cache_tokens, has_refill, tokens_refill_at, refill_interval)
-     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?)`
+        `INSERT OR REPLACE INTO api_keys (api_key, name, created_at, expires_at, token_limit, tokens_used, input_tokens, output_tokens, cache_tokens, has_refill, tokens_refill_at, refill_interval, bound_ip)
+     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, NULL)`
     ).run(apiKey, record.name, record.createdAt, record.expiresAt, record.tokenLimit ?? 0, hasRefill, refillAt, interval);
 }
 
@@ -84,6 +91,14 @@ function performRefillReset(apiKey, nextRefill) {
     ).run(nextRefill, apiKey);
 }
 
+function bindKeyIp(apiKey, ip) {
+    db.prepare("UPDATE api_keys SET bound_ip = ? WHERE api_key = ? AND bound_ip IS NULL").run(ip, apiKey);
+}
+
+function resetKeyIp(apiKey) {
+    db.prepare("UPDATE api_keys SET bound_ip = NULL WHERE api_key = ?").run(apiKey);
+}
+
 module.exports = {
     db,
     initDB,
@@ -96,4 +111,6 @@ module.exports = {
     resetTokens,
     updateTokenLimit,
     performRefillReset,
+    bindKeyIp,
+    resetKeyIp,
 };

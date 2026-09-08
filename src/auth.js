@@ -1,5 +1,16 @@
-const { getKey, deleteKey, performRefillReset } = require('./db');
+const { getKey, deleteKey, performRefillReset, bindKeyIp } = require('./db');
 const { nextRefillTime } = require('./utils/time');
+
+function getClientIp(req) {
+    let ip = req.headers["x-forwarded-for"] || req.ip || req.socket?.remoteAddress || "";
+    if (typeof ip === "string" && ip.includes(",")) {
+        ip = ip.split(",")[0].trim();
+    }
+    if (typeof ip === "string") {
+        ip = ip.replace(/^::ffff:/, "");
+    }
+    return ip;
+}
 
 function validateKey(req) {
     const apiKey =
@@ -31,7 +42,22 @@ function validateKey(req) {
         return { error: { message: "Token limit exceeded", status: 429 } };
     }
 
+    const clientIp = getClientIp(req);
+    if (clientIp) {
+        if (!record.bound_ip) {
+            bindKeyIp(apiKey, clientIp);
+            record.bound_ip = clientIp;
+        } else if (record.bound_ip !== clientIp) {
+            return {
+                error: {
+                    message: `Access denied: Key is locked to IP ${record.bound_ip}. Request came from ${clientIp}`,
+                    status: 403
+                }
+            };
+        }
+    }
+
     return { apiKey, record };
 }
 
-module.exports = { validateKey };
+module.exports = { validateKey, getClientIp };
