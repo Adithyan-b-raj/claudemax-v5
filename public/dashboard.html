@@ -480,11 +480,12 @@
           ? `${used.toLocaleString()} / ${limit.toLocaleString()} tokens (this period)`
           : `${used.toLocaleString()} tokens this period (unlimited)`;
         const refillIntervalLabel = k.refillInterval === 'daily' ? 'daily 00:00' : 'every 5h';
+        const windowLabel = k.refillInterval === 'daily' ? 'Daily Window' : '5h Window';
         const periodCost = calcCost(input, output, cache);
         const lifetime = calcCost(totalIn, totalOut, totalCache);
         const breakdown = (input > 0 || output > 0 || cache > 0)
           ? `<div class="token-breakdown">
-               <span style="color:#aaa; font-size:0.75rem;">Period:</span>
+               <span style="color:#aaa; font-size:0.75rem;">${windowLabel}:</span>
                <span class="token-in">In: ${input.toLocaleString()}</span>
                <span class="token-out">Out: ${output.toLocaleString()}</span>
                ${cache > 0 ? `<span class="token-cache">Cache: ${cache.toLocaleString()}</span>` : ''}
@@ -493,7 +494,7 @@
           : '';
         const lifetimeBreakdown = totalUsed > 0
           ? `<div class="token-breakdown" style="margin-top:0.15rem;">
-               <span style="color:#aaa; font-size:0.75rem;">Lifetime:</span>
+               <span style="color:#aaa; font-size:0.75rem;">All-Time Total:</span>
                <span class="token-in">In: ${totalIn.toLocaleString()}</span>
                <span class="token-out">Out: ${totalOut.toLocaleString()}</span>
                ${totalCache > 0 ? `<span class="token-cache">Cache: ${totalCache.toLocaleString()}</span>` : ''}
