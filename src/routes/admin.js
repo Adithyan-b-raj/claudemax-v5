@@ -8,6 +8,7 @@ const {
     updateTokenLimit,
     updateRefill,
     resetKeyIp,
+    getKeyHistory,
 } = require('../db');
 const { generateKey } = require('../utils/keygen');
 const { nextRefillTime } = require('../utils/time');
@@ -119,6 +120,22 @@ router.post('/update-refill', checkAdminAuth, (req, res) => {
     const refillAt = enable ? nextRefillTime(interval) : null;
     updateRefill(body.apiKey, enable, refillAt, interval);
     res.json({ ok: true, tokensRefillAt: refillAt, refillInterval: interval });
+});
+
+// Returns the last 50 completed windows for a given key
+router.get('/history/:apiKey', checkAdminAuth, (req, res) => {
+    const rows = getKeyHistory(req.params.apiKey, 50);
+    const history = rows.map(r => ({
+        id: r.id,
+        windowType: r.window_type,
+        windowStart: r.window_start,
+        windowEnd: r.window_end,
+        tokensUsed: r.tokens_used,
+        inputTokens: r.input_tokens,
+        outputTokens: r.output_tokens,
+        cacheTokens: r.cache_tokens,
+    }));
+    res.json({ history });
 });
 
 module.exports = router;

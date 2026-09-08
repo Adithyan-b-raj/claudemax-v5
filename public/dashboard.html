@@ -219,6 +219,58 @@
       white-space: nowrap;
     }
 
+    .history-panel {
+      margin-top: 0.6rem;
+      border-top: 1px solid #2a2a2a;
+      padding-top: 0.6rem;
+    }
+
+    .history-panel .hist-title {
+      font-size: 0.75rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+
+    .history-row {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 0.78rem;
+      color: #777;
+      padding: 0.3rem 0;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .history-row:last-child {
+      border-bottom: none;
+    }
+
+    .hist-win {
+      color: #888;
+      white-space: nowrap;
+      min-width: 100px;
+    }
+
+    .hist-in {
+      color: #4a9eff;
+    }
+
+    .hist-out {
+      color: #4aff9e;
+    }
+
+    .hist-cache {
+      color: #ffaa4a;
+    }
+
+    .hist-cost {
+      color: #d4af37;
+      font-weight: 600;
+    }
+
     .key-value {
       font-family: monospace;
       font-size: 0.85rem;
@@ -455,12 +507,17 @@
             <button class="btn-secondary" onclick="toggleRefill('${k.apiKey}', ${k.hasRefill}, '${k.refillInterval}')" style="${k.hasRefill ? 'color:#4aff9e' : ''}">${k.hasRefill ? `Refill ${k.refillInterval === 'daily' ? 'Daily' : '5h'}` : 'Refill OFF'}</button>
             <button class="btn-secondary" onclick="resetTokens('${k.apiKey}')">Reset Tokens</button>
             <button class="btn-secondary" onclick="resetIp('${k.apiKey}')">Reset IP</button>
+            <button class="btn-secondary" onclick="toggleHistory('${k.apiKey}')">History</button>
             <button class="btn-danger" onclick="revokeKey('${k.apiKey}')">Revoke</button>
           </div>
           <div id="edit-limit-${k.apiKey}" class="edit-limit-row hidden">
             <input type="number" id="limit-input-${k.apiKey}" value="${limit}" min="0" placeholder="0 = unlimited">
             <button class="btn-primary" onclick="saveLimit('${k.apiKey}')">Save</button>
             <button class="btn-secondary" onclick="toggleEditLimit('${k.apiKey}')">Cancel</button>
+          </div>
+          <div id="history-${k.apiKey}" class="history-panel hidden">
+            <div class="hist-title">📋 Window History (last 50)</div>
+            <div id="history-rows-${k.apiKey}"><em style="color:#555;">Loading...</em></div>
           </div>
         </div>`;
       }).join('');
@@ -513,6 +570,46 @@
       await api('POST', '/admin/reset-ip', { apiKey });
       showAlert('IP binding reset', 'success');
       loadKeys();
+    }
+
+    async function toggleHistory(apiKey) {
+      const panel = document.getElementById(`history-${apiKey}`);
+      if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        await loadHistory(apiKey);
+      } else {
+        panel.classList.add('hidden');
+      }
+    }
+
+    async function loadHistory(apiKey) {
+      const rowsEl = document.getElementById(`history-rows-${apiKey}`);
+      const data = await api('GET', `/admin/history/${apiKey}`);
+      if (data.error || !data.history) {
+        rowsEl.innerHTML = '<em style="color:#555;">Failed to load history.</em>';
+        return;
+      }
+      if (data.history.length === 0) {
+        rowsEl.innerHTML = '<em style="color:#555;">No completed windows yet. Data appears here after the first refill cycle.</em>';
+        return;
+      }
+      const fmt = iso => {
+        const d = new Date(iso);
+        return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      };
+      rowsEl.innerHTML = data.history.map(h => {
+        const cost = calcCost(h.inputTokens, h.outputTokens, h.cacheTokens);
+        const label = h.windowType === 'daily' ? '24h' : '5h';
+        return `<div class="history-row">
+          <span class="hist-win">${fmt(h.windowStart)} → ${fmt(h.windowEnd)}</span>
+          <span style="color:#555; font-size:0.72rem;">[${label}]</span>
+          <span class="hist-in">In: ${h.inputTokens.toLocaleString()}</span>
+          <span class="hist-out">Out: ${h.outputTokens.toLocaleString()}</span>
+          ${h.cacheTokens > 0 ? `<span class="hist-cache">Cache: ${h.cacheTokens.toLocaleString()}</span>` : ''}
+          <span style="color:#aaa;">Total: ${h.tokensUsed.toLocaleString()}</span>
+          <span class="hist-cost">≈ $${cost}</span>
+        </div>`;
+      }).join('');
     }
 
     async function toggleRefill(apiKey, currentlyEnabled, currentInterval) {
