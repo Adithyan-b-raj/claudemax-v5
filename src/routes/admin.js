@@ -6,6 +6,7 @@ const {
     deleteKey,
     resetTokens,
     updateTokenLimit,
+    updateCreditLimit,
     updateRefill,
     resetKeyIp,
     getKeyHistory,
@@ -50,6 +51,7 @@ router.get('/keys', checkAdminAuth, (req, res) => {
         totalInputTokens: r.total_input_tokens ?? 0,
         totalOutputTokens: r.total_output_tokens ?? 0,
         totalCacheTokens: r.total_cache_tokens ?? 0,
+        creditLimitUsd: r.credit_limit_usd ?? 0,
     }));
     res.json({ keys });
 });
@@ -59,6 +61,7 @@ router.post('/create', checkAdminAuth, (req, res) => {
     const days = Math.min(365, Math.max(1, parseInt(body.days) || 7));
     const name = (body.name || "api-key").slice(0, 50);
     const tokenLimit = Math.max(0, parseInt(body.tokenLimit) || 0);
+    const creditLimitUsd = Math.max(0, parseFloat(body.creditLimitUsd) || 0);
     const hasRefill = body.enableRefill === true;
     const refillInterval = ["5h", "daily"].includes(body.refillInterval) ? body.refillInterval : "5h";
     const apiKey = generateKey(32);
@@ -69,6 +72,7 @@ router.post('/create', checkAdminAuth, (req, res) => {
         createdAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
         tokenLimit,
+        creditLimitUsd,
         hasRefill,
         refillInterval,
     };
@@ -109,6 +113,14 @@ router.post('/update-token-limit', checkAdminAuth, (req, res) => {
     if (!body.apiKey) return res.status(400).json({ error: "apiKey required" });
     const tokenLimit = Math.max(0, parseInt(body.tokenLimit) || 0);
     updateTokenLimit(body.apiKey, tokenLimit);
+    res.json({ ok: true });
+});
+
+router.post('/update-credit-limit', checkAdminAuth, (req, res) => {
+    const body = req.body || {};
+    if (!body.apiKey) return res.status(400).json({ error: "apiKey required" });
+    const creditLimitUsd = Math.max(0, parseFloat(body.creditLimitUsd) || 0);
+    updateCreditLimit(body.apiKey, creditLimitUsd);
     res.json({ ok: true });
 });
 

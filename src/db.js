@@ -58,6 +58,7 @@ function initDB() {
         `ALTER TABLE api_keys ADD COLUMN total_input_tokens INTEGER NOT NULL DEFAULT 0`,
         `ALTER TABLE api_keys ADD COLUMN total_output_tokens INTEGER NOT NULL DEFAULT 0`,
         `ALTER TABLE api_keys ADD COLUMN total_cache_tokens INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE api_keys ADD COLUMN credit_limit_usd REAL NOT NULL DEFAULT 0`,
     ];
     for (const sql of migrations) {
         try { db.exec(sql); } catch (_) { /* column already exists */ }
@@ -89,9 +90,10 @@ function putKey(apiKey, record) {
          (api_key, name, created_at, expires_at, token_limit,
           tokens_used, input_tokens, output_tokens, cache_tokens,
           has_refill, tokens_refill_at, refill_interval, bound_ip,
-          total_tokens_used, total_input_tokens, total_output_tokens, total_cache_tokens)
-         VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, NULL, 0, 0, 0, 0)`
-    ).run(apiKey, record.name, record.createdAt, record.expiresAt, record.tokenLimit ?? 0, hasRefill, refillAt, interval);
+          total_tokens_used, total_input_tokens, total_output_tokens, total_cache_tokens,
+          credit_limit_usd)
+         VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, NULL, 0, 0, 0, 0, ?)`
+    ).run(apiKey, record.name, record.createdAt, record.expiresAt, record.tokenLimit ?? 0, hasRefill, refillAt, interval, record.creditLimitUsd ?? 0);
 }
 
 function deleteKey(apiKey) {
@@ -135,6 +137,10 @@ function resetTokens(apiKey) {
 
 function updateTokenLimit(apiKey, tokenLimit) {
     db.prepare("UPDATE api_keys SET token_limit = ? WHERE api_key = ?").run(tokenLimit, apiKey);
+}
+
+function updateCreditLimit(apiKey, creditLimitUsd) {
+    db.prepare("UPDATE api_keys SET credit_limit_usd = ? WHERE api_key = ?").run(creditLimitUsd, apiKey);
 }
 
 /**
@@ -197,6 +203,7 @@ module.exports = {
     updateRefill,
     resetTokens,
     updateTokenLimit,
+    updateCreditLimit,
     performRefillReset,
     getKeyHistory,
     bindKeyIp,

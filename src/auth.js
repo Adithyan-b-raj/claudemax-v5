@@ -42,6 +42,17 @@ function validateKey(req) {
         return { error: { message: "Token limit exceeded", status: 429 } };
     }
 
+    if (record.credit_limit_usd > 0) {
+        const lifetimeCostUsd = (
+            (record.total_input_tokens ?? 0) * 3.00 +
+            (record.total_output_tokens ?? 0) * 15.00 +
+            (record.total_cache_tokens ?? 0) * 0.30
+        ) / 1_000_000;
+        if (lifetimeCostUsd >= record.credit_limit_usd) {
+            return { error: { message: `Credit limit of $${record.credit_limit_usd.toFixed(2)} exceeded`, status: 429 } };
+        }
+    }
+
     const clientIp = getClientIp(req);
     if (clientIp) {
         if (!record.bound_ip) {
