@@ -27,9 +27,19 @@
     }
     .subtitle { font-size: 0.875rem; color: #64748b; margin-bottom: 32px; }
 
-    .lookup-card {
+    .page-container {
       width: 100%;
       max-width: 540px;
+    }
+
+    @media (min-width: 900px) {
+      .page-container {
+        max-width: 900px;
+      }
+    }
+
+    .lookup-card {
+      width: 100%;
       background: #1e2130;
       border: 1px solid #2d3148;
       border-radius: 12px;
@@ -85,10 +95,26 @@
     /* Results */
     #results {
       width: 100%;
-      max-width: 540px;
       display: none;
       flex-direction: column;
       gap: 16px;
+    }
+
+    @media (min-width: 900px) {
+      #results {
+        display: none;
+        grid-template-columns: 1fr 2fr;
+        grid-template-rows: auto;
+        gap: 16px;
+      }
+      #results.visible {
+        display: grid;
+      }
+      #cardStatus  { grid-column: 1; grid-row: 1; }
+      #cardRefill  { grid-column: 1; grid-row: 2; }
+      #cardPeriod  { grid-column: 2; grid-row: 1; }
+      #cardCredit  { grid-column: 2; grid-row: 2; }
+      #cardAllTime { grid-column: 2; grid-row: 3; }
     }
 
     .card {
@@ -189,6 +215,7 @@
   <h1>My API Key Limits</h1>
   <p class="subtitle">Enter your API key to view usage and limits</p>
 
+  <div class="page-container">
   <div class="lookup-card">
     <div class="input-row">
       <input id="keyInput" type="password" placeholder="sk-..." autocomplete="off" />
@@ -200,7 +227,7 @@
   <div id="results">
 
     <!-- Status -->
-    <div class="card" id="cardStatus">
+    <div class="card" id="cardStatus" style="align-self:start">
       <div class="card-title">Key Info</div>
       <div class="meta-row">
         <span class="meta-label">Name</span>
@@ -286,7 +313,7 @@
     </div>
 
     <!-- Refill -->
-    <div class="card" id="cardRefill">
+    <div class="card" id="cardRefill" style="align-self:start">
       <div class="card-title">Token Refill</div>
       <div class="refill-info">
         <div class="refill-dot" id="refillDot"></div>
@@ -295,6 +322,7 @@
     </div>
 
   </div>
+  </div><!-- /.page-container -->
 
   <script>
     const $ = id => document.getElementById(id);
@@ -334,6 +362,7 @@
       const errEl = $('errorMsg');
       errEl.style.display = 'none';
       $('results').style.display = 'none';
+      $('results').classList.remove('visible');
 
       if (!key) {
         errEl.textContent = 'Please enter your API key.';
@@ -427,7 +456,9 @@
         $('refillText').textContent = 'Token refill is disabled';
       }
 
-      $('results').style.display = 'flex';
+      const resultsEl = $('results');
+      resultsEl.classList.add('visible');
+      if (window.innerWidth < 900) resultsEl.style.display = 'flex';
     }
 
     // Allow Enter key to trigger inspect
