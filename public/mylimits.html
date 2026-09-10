@@ -102,13 +102,9 @@
 
     @media (min-width: 900px) {
       #results {
-        display: none;
         grid-template-columns: 1fr 2fr;
         grid-template-rows: auto;
         gap: 16px;
-      }
-      #results.visible {
-        display: grid;
       }
       #cardStatus  { grid-column: 1; grid-row: 1; }
       #cardRefill  { grid-column: 1; grid-row: 2; }
@@ -362,7 +358,6 @@
       const errEl = $('errorMsg');
       errEl.style.display = 'none';
       $('results').style.display = 'none';
-      $('results').classList.remove('visible');
 
       if (!key) {
         errEl.textContent = 'Please enter your API key.';
@@ -457,8 +452,7 @@
       }
 
       const resultsEl = $('results');
-      resultsEl.classList.add('visible');
-      if (window.innerWidth < 900) resultsEl.style.display = 'flex';
+      resultsEl.style.display = window.innerWidth >= 900 ? 'grid' : 'flex';
     }
 
     // Allow Enter key to trigger inspect
