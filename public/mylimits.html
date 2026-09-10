@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My API Key Limits</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .subtitle { font-size: 0.875rem; color: #64748b; margin-bottom: 32px; }
+
+    .lookup-card {
+      width: 100%;
+      max-width: 540px;
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+    .input-row input {
+      flex: 1;
+      background: #131622;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      font-family: 'Courier New', monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-row input:focus { border-color: #6366f1; }
+    .input-row input::placeholder { color: #475569; }
+
+    .btn {
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #4f46e5; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error-msg {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #2d1b1b;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      color: #fca5a5;
+      font-size: 0.85rem;
+      display: none;
+    }
+
+    /* Results */
+    #results {
+      width: 100%;
+      max-width: 540px;
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 20px 22px;
+    }
+    .card-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+    }
+    .meta-label { color: #94a3b8; }
+    .meta-value { color: #f1f5f9; font-weight: 500; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-active { background: #14532d; color: #86efac; }
+    .badge-expired { background: #7f1d1d; color: #fca5a5; }
+
+    .bar-wrap {
+      background: #131622;
+      border-radius: 6px;
+      height: 8px;
+      overflow: hidden;
+      margin: 10px 0 6px;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      background: #6366f1;
+      transition: width 0.4s ease;
+    }
+    .bar-fill.warn { background: #f59e0b; }
+    .bar-fill.full { background: #ef4444; }
+    .bar-fill.unlimited { background: #22c55e; width: 100% !important; }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .bar-label .used { color: #e2e8f0; font-weight: 500; }
+
+    .token-breakdown {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+    .token-stat {
+      background: #131622;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .token-stat .ts-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .token-stat .ts-value { font-size: 1rem; font-weight: 600; color: #f1f5f9; }
+    .token-stat .ts-cost { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+    .refill-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .refill-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      flex-shrink: 0;
+    }
+    .refill-dot.off { background: #475569; }
+
+    .divider { height: 1px; background: #2d3148; margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+  <h1>My API Key Limits</h1>
+  <p class="subtitle">Enter your API key to view usage and limits</p>
+
+  <div class="lookup-card">
+    <div class="input-row">
+      <input id="keyInput" type="password" placeholder="sk-..." autocomplete="off" />
+      <button class="btn" id="inspectBtn" onclick="inspect()">Inspect</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <div id="results">
+
+    <!-- Status -->
+    <div class="card" id="cardStatus">
+      <div class="card-title">Key Info</div>
+      <div class="meta-row">
+        <span class="meta-label">Name</span>
+        <span class="meta-value" id="keyName">—</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Status</span>
+        <span id="statusBadge"></span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Expires</span>
+        <span class="meta-value" id="expiresAt">—</span>
+      </div>
+    </div>
+
+    <!-- Current Period Tokens -->
+    <div class="card" id="cardPeriod">
+      <div class="card-title">Current Period Tokens</div>
+      <div class="bar-wrap"><div class="bar-fill" id="tokenBar" style="width:0%"></div></div>
+      <div class="bar-label">
+        <span class="used" id="tokenUsedLabel">0 used</span>
+        <span id="tokenLimitLabel">no limit</span>
+      </div>
+      <div class="token-breakdown">
+        <div class="token-stat">
+          <div class="ts-label">Input</div>
+          <div class="ts-value" id="periodInput">0</div>
+          <div class="ts-cost" id="periodInputCost">$0.00</div>
+        </div>
+        <div class="token-stat">
+          <div class="ts-label">Output</div>
+          <div class="ts-value" id="periodOutput">0</div>
+          <div class="ts-cost" id="periodOutputCost">$0.00</div>
+        </div>
+        <div class="token-stat">
+          <div class="ts-label">Cache</div>
+          <div class="ts-value" id="periodCache">0</div>
+          <div class="ts-cost" id="periodCacheCost">$0.00</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="meta-row" style="margin-bottom:0">
+        <span class="meta-label">Estimated cost this period</span>
+        <span class="meta-value" id="periodCostTotal">$0.00</span>
+      </div>
+    </div>
+
+    <!-- Credit Limit (shown only when set) -->
+    <div class="card" id="cardCredit" style="display:none">
+      <div class="card-title">Credit Limit (USD)</div>
+      <div class="bar-wrap"><div class="bar-fill" id="creditBar" style="width:0%"></div></div>
+      <div class="bar-label">
+        <span class="used" id="creditUsedLabel">$0.00 used</span>
+        <span id="creditLimitLabel">$0.00 limit</span>
+      </div>
+    </div>
+
+    <!-- All-Time Usage -->
+    <div class="card" id="cardAllTime">
+      <div class="card-title">All-Time Usage</div>
+      <div class="token-breakdown">
+        <div class="token-stat">
+          <div class="ts-label">Input</div>
+          <div class="ts-value" id="totalInput">0</div>
+          <div class="ts-cost" id="totalInputCost">$0.00</div>
+        </div>
+        <div class="token-stat">
+          <div class="ts-label">Output</div>
+          <div class="ts-value" id="totalOutput">0</div>
+          <div class="ts-cost" id="totalOutputCost">$0.00</div>
+        </div>
+        <div class="token-stat">
+          <div class="ts-label">Cache</div>
+          <div class="ts-value" id="totalCache">0</div>
+          <div class="ts-cost" id="totalCacheCost">$0.00</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="meta-row" style="margin-bottom:0">
+        <span class="meta-label">Estimated all-time cost</span>
+        <span class="meta-value" id="totalCostAll">$0.00</span>
+      </div>
+    </div>
+
+    <!-- Refill -->
+    <div class="card" id="cardRefill">
+      <div class="card-title">Token Refill</div>
+      <div class="refill-info">
+        <div class="refill-dot" id="refillDot"></div>
+        <span id="refillText">—</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+
+    function fmt(n) {
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return n.toString();
+    }
+
+    function cost(input, output, cache) {
+      return (input * 3 + output * 15 + cache * 0.3) / 1_000_000;
+    }
+
+    function fmtCost(usd) {
+      return '$' + usd.toFixed(4).replace(/\.?0+$/, '') || '$0';
+    }
+
+    function fmtDate(iso) {
+      return new Date(iso).toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function timeUntil(iso) {
+      const diff = new Date(iso) - Date.now();
+      if (diff <= 0) return 'now';
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      if (h >= 24) return Math.floor(h / 24) + 'd ' + (h % 24) + 'h';
+      return h + 'h ' + m + 'm';
+    }
+
+    async function inspect() {
+      const key = $('keyInput').value.trim();
+      const errEl = $('errorMsg');
+      errEl.style.display = 'none';
+      $('results').style.display = 'none';
+
+      if (!key) {
+        errEl.textContent = 'Please enter your API key.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const btn = $('inspectBtn');
+      btn.disabled = true;
+      btn.textContent = 'Loading…';
+
+      try {
+        const res = await fetch('/api/key-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: key }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.error || 'Something went wrong.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        render(data);
+      } catch (e) {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Inspect';
+      }
+    }
+
+    function render(d) {
+      // Status
+      $('keyName').textContent = d.name;
+      $('expiresAt').textContent = fmtDate(d.expiresAt);
+      $('statusBadge').innerHTML = d.expired
+        ? '<span class="badge badge-expired">Expired</span>'
+        : '<span class="badge badge-active">Active</span>';
+
+      // Period tokens
+      const pct = d.tokenLimit > 0 ? Math.min(100, (d.tokensUsed / d.tokenLimit) * 100) : 0;
+      const bar = $('tokenBar');
+      bar.style.width = d.tokenLimit > 0 ? pct + '%' : '100%';
+      bar.className = 'bar-fill' + (d.tokenLimit === 0 ? ' unlimited' : pct >= 100 ? ' full' : pct >= 80 ? ' warn' : '');
+      $('tokenUsedLabel').textContent = fmt(d.tokensUsed) + ' used';
+      $('tokenLimitLabel').textContent = d.tokenLimit > 0 ? 'limit: ' + fmt(d.tokenLimit) : 'no limit';
+
+      $('periodInput').textContent = fmt(d.inputTokens);
+      $('periodOutput').textContent = fmt(d.outputTokens);
+      $('periodCache').textContent = fmt(d.cacheTokens);
+      $('periodInputCost').textContent = fmtCost(d.inputTokens * 3 / 1e6);
+      $('periodOutputCost').textContent = fmtCost(d.outputTokens * 15 / 1e6);
+      $('periodCacheCost').textContent = fmtCost(d.cacheTokens * 0.3 / 1e6);
+      $('periodCostTotal').textContent = fmtCost(cost(d.inputTokens, d.outputTokens, d.cacheTokens));
+
+      // Credit limit
+      if (d.creditLimitUsd > 0) {
+        const lifetimeCost = cost(d.totalInputTokens, d.totalOutputTokens, d.totalCacheTokens);
+        const cpct = Math.min(100, (lifetimeCost / d.creditLimitUsd) * 100);
+        const cbar = $('creditBar');
+        cbar.style.width = cpct + '%';
+        cbar.className = 'bar-fill' + (cpct >= 100 ? ' full' : cpct >= 80 ? ' warn' : '');
+        $('creditUsedLabel').textContent = fmtCost(lifetimeCost) + ' used';
+        $('creditLimitLabel').textContent = 'limit: $' + d.creditLimitUsd.toFixed(2);
+        $('cardCredit').style.display = 'block';
+      } else {
+        $('cardCredit').style.display = 'none';
+      }
+
+      // All-time
+      $('totalInput').textContent = fmt(d.totalInputTokens);
+      $('totalOutput').textContent = fmt(d.totalOutputTokens);
+      $('totalCache').textContent = fmt(d.totalCacheTokens);
+      $('totalInputCost').textContent = fmtCost(d.totalInputTokens * 3 / 1e6);
+      $('totalOutputCost').textContent = fmtCost(d.totalOutputTokens * 15 / 1e6);
+      $('totalCacheCost').textContent = fmtCost(d.totalCacheTokens * 0.3 / 1e6);
+      $('totalCostAll').textContent = fmtCost(cost(d.totalInputTokens, d.totalOutputTokens, d.totalCacheTokens));
+
+      // Refill
+      const dot = $('refillDot');
+      if (d.hasRefill && d.tokensRefillAt) {
+        dot.className = 'refill-dot';
+        const interval = d.refillInterval === 'daily' ? 'daily' : 'every 5 hours';
+        $('refillText').textContent = `Refills ${interval} — next refill in ${timeUntil(d.tokensRefillAt)}`;
+      } else {
+        dot.className = 'refill-dot off';
+        $('refillText').textContent = 'Token refill is disabled';
+      }
+
+      $('results').style.display = 'flex';
+    }
+
+    // Allow Enter key to trigger inspect
+    $('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') inspect(); });
+  </script>
+
+</body>
+</html>

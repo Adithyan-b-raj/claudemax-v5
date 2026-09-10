@@ -39,7 +39,9 @@ app.use(require('./routes/messages'));
 app.use(require('./routes/completions'));
 app.use(require('./routes/models'));
 app.use('/admin', require('./routes/admin'));
+app.use(require('./routes/keyinfo'));
 
+app.get('/mylimits', (req, res) => res.sendFile(path.join(__dirname, '../public/mylimits.html')));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 initDB();
